@@ -19,6 +19,18 @@ try {
     console.error('Không thể đọc file messages.json:', err);
 }
 
+// Tạo đường dẫn đầy đủ đến thư mục 'uploads'
+const uploadDir = path.join(__dirname, 'uploads');
+
+// Kiểm tra xem thư mục 'uploads' có tồn tại không
+if (!fs.existsSync(uploadDir)) {
+    // Nếu chưa tồn tại, tạo thư mục mới
+    fs.mkdirSync(uploadDir, { recursive: true });
+    console.log('Thư mục "uploads" đã được tạo.');
+} else {
+    console.log('Thư mục "uploads" đã tồn tại.');
+}
+
 // Cấu hình Multer để tải file lên
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
@@ -57,7 +69,6 @@ app.post('/upload', upload.single('media'), (req, res) => {
         res.status(400).json({ error: 'File upload failed' });
     }
 });
-
 // Cho phép truy cập thư mục 'uploads' để xem các file đã tải lên
 app.use('/uploads', express.static('uploads'));
 // Định nghĩa mã HTML, CSS và JavaScript dưới dạng chuỗi
