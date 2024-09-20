@@ -244,7 +244,9 @@ transform: translate(-50px, -200px);
 </head>
 <body>
 <script>
-alert("Tính năng gửi ảnh đang gặp sự cố. Hãy đợi chúng tôi khắc phục sau.");
+    document.addEventListener('DOMContentLoaded', (event) => {
+        alert("Tính năng gửi ảnh đang gặp sự cố. Hãy đợi chúng tôi khắc phục sau.");
+    });
 </script>
     <div class="menu-btn">
         <span class="menu-btn__burger"></span>
