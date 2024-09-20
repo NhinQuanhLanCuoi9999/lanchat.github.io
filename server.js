@@ -2,6 +2,8 @@ const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
 const fs = require('fs');
+const multer = require('multer');
+const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
@@ -17,6 +19,47 @@ try {
     console.error('Không thể đọc file messages.json:', err);
 }
 
+// Cấu hình Multer để tải file lên
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, 'uploads/'); // Lưu file vào thư mục 'uploads'
+    },
+    filename: (req, file, cb) => {
+        cb(null, Date.now() + path.extname(file.originalname)); // Đặt tên file duy nhất
+    }
+});
+
+const upload = multer({ storage: storage });
+
+// Route để xử lý tải file
+app.post('/upload', upload.single('media'), (req, res) => {
+    if (req.file) {
+        const fileUrl = `/uploads/${req.file.filename}`;
+        const message = {
+            type: 'file',
+            fileUrl: fileUrl,
+            timestamp: Date.now()
+        };
+        
+        // Thêm tin nhắn mới vào mảng
+        messages.push(message);
+
+        // Ghi lại dữ liệu tin nhắn vào file JSON
+        fs.writeFile('messages.json', JSON.stringify(messages), (err) => {
+            if (err) {
+                console.error('Không thể lưu file messages.json:', err);
+            }
+        });
+
+        // Trả về URL của file đã upload
+        res.json({ imageUrl: fileUrl });
+    } else {
+        res.status(400).json({ error: 'File upload failed' });
+    }
+});
+
+// Cho phép truy cập thư mục 'uploads' để xem các file đã tải lên
+app.use('/uploads', express.static('uploads'));
 // Định nghĩa mã HTML, CSS và JavaScript dưới dạng chuỗi
 const htmlContent = `
 <!DOCTYPE html>
@@ -207,7 +250,7 @@ transform: translate(-50px, -200px);
     <script src="/socket.io/socket.io.js"></script>
     <script>
         /* Các script từ code 1 */
-var socket = io();
+    var socket = io();
 var form = document.getElementById('form');
 var nameInput = document.getElementById('name');
 var messageInput = document.getElementById('input');
@@ -292,36 +335,23 @@ function sendMessage() {
     };
 
     if (mediaInput.files.length > 0) {
-        var file = mediaInput.files[0];
-        var reader = new FileReader();
-        reader.onloadend = function() {
-            if (file.type.startsWith('image/')) {
-                message.image = reader.result;
-            } else if (file.type.startsWith('video/')) {
-                message.video = reader.result;
-            } else if (file.type.startsWith('text/')) {
-                var textFile = new Blob([reader.result], { type: 'text/plain' });
-                var url = URL.createObjectURL(textFile);
-                message.textFile = url;
-            } else if (file.type === 'application/pdf' || 
-                       file.type === 'text/html' || 
-                       file.type === 'text/css' || 
-                       file.type === 'application/javascript' || 
-                       file.type === 'application/x-httpd-php' || 
-                       file.type === 'application/sql' || 
-                       file.type === 'application/msword' || 
-                       file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || 
-                       file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
-                // Xử lý các loại file khác
-                var fileBlob = new Blob([reader.result], { type: file.type });
-                var fileUrl = URL.createObjectURL(fileBlob);
-                message.file = { url: fileUrl, name: file.name };
+        var formData = new FormData();
+        formData.append('media', mediaInput.files[0]);
+
+        fetch('/upload', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.imageUrl) {
+                message.image = data.imageUrl;
             }
             socket.emit('chat message', message);
             messageInput.value = '';
             mediaInput.value = '';
-        };
-        reader.readAsArrayBuffer(file);  // Đọc file dưới dạng nhị phân cho tất cả các loại file
+        })
+        .catch(error => console.error('File upload error:', error));
     } else {
         socket.emit('chat message', message);
         messageInput.value = '';
@@ -354,7 +384,7 @@ const sideNav = document.querySelector('.side-nav');
 menuBtn.addEventListener('click', () => {
     sideNav.classList.toggle('open');
 });
-    </script>
+</script>
 </body>
 </html>
 `;
@@ -376,7 +406,7 @@ io.on('connection', (socket) => {
 
         // Lưu dữ liệu tin nhắn vào file JSON
         try {
-            fs.writeFileSync('messages.json', JSON.stringify(messages));
+            fs.writeFileSync('messages.json', JSON.stringify(messages)); 
         } catch (err) {
             console.error('Không thể lưu file messages.json:', err);
         }
